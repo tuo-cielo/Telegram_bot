@@ -22,8 +22,9 @@ enum Command {
     Mtuci,
     #[command(description = "Рассказывает о ВУЗе если вы только собрались поступить к нам")]
     Абитуриенту,
-    #[command(description = "Вы вводите ваши экзамены мы советуем направления")]
+    #[command(description = "Мы рассказываем о некоторых наших направлениях")]
     Направления
+
 }
 
 async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
