@@ -13,11 +13,6 @@ async fn main() {
 
     Command::repl(bot, answer).await;
 
-    let dispatcher = Dispatcher::new(bot)
-        .messages_handler(analyze_message);
-
-    dispatcher.dispatch().await;
-
     }
 
 
