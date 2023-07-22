@@ -1,6 +1,7 @@
-use teloxide::{prelude::*, utils::command::BotCommands};
-use teloxide::types::Message;
+use teloxide::{handler, prelude::*, repl, utils::command::BotCommands};
 use dotenvy::dotenv;
+use teloxide::types::Message;
+use teloxide::types::AllowedUpdate;
 
 #[tokio::main]
 async fn main() {
@@ -11,7 +12,9 @@ async fn main() {
     let bot = Bot::new(token); //Это важно
 
     Command::repl(bot, answer).await;
-}
+
+    }
+
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase", description = "Существуют следующие команды:")]
@@ -24,7 +27,6 @@ enum Command {
     Абитуриенту,
     #[command(description = "Мы рассказываем о некоторых наших направлениях")]
     Направления
-
 }
 
 async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
@@ -104,11 +106,37 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
     Ok(())
 }
 
-//async fn analyze_message(text: &str) -> String {
+
+//другой вариант
+// async fn handle_message(bot: Bot, msg: Message, text: &str) -> Result<(), Box<dyn std::error::Error>> {
 //     if text.contains("привет") {
-//         "Привет!".to_string()
+//         bot.send_message(msg.chat.id, "Привет!").await?;
+//     } else if text.contains("как дела?") {
+//         bot.send_message(msg.chat.id, "Хорошо").await?;
 //     } else {
-//         "Я не понимаю эту команду.".to_string()
-//         }
+//         bot.send_message(msg.chat.id, "Я не понимаю вас.").await?;
+//     }
 //
+//     Ok(())
 // }
+//
+// async fn analyze_message(bot: Bot, msg: Message, text: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+//     if let Some(text) = text {
+//         handle_message(bot, msg, &text).await?;
+//     }
+//
+//     Ok(())
+//}
+
+
+async fn analyze_message(bot: Bot, msg: Message, text: &str) -> Result<(), Box<dyn std::error::Error>> {
+    if text.contains("привет") {
+        bot.send_message(msg.chat.id, "Привет!").await?;
+    } else if text.contains("как дела?") {
+        bot.send_message(msg.chat.id, "Хорошо").await?;
+    } else {
+        bot.send_message(msg.chat.id, "Я не понимаю вас.").await?;
+    }
+
+    Ok(())
+}
