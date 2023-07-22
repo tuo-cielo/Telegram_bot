@@ -1,4 +1,4 @@
-use teloxide::{handler, prelude::*, repl, utils::command::BotCommands};
+use teloxide::{filter_command, handler, prelude::*, repl, utils::command::BotCommands};
 use dotenvy::dotenv;
 use teloxide::types::Message;
 use teloxide::types::AllowedUpdate;
@@ -9,9 +9,14 @@ async fn main() {
     log::info!("Starting command bot...");
 
     let token = dotenvy::var("TELOXIDE_TOKEN").unwrap(); //Это не трогать
-    let bot = Bot::new(token); //Это важно
+    let bot = Bot::new(token); //Не трогать
 
     Command::repl(bot, answer).await;
+
+    let dispatcher = Dispatcher::new(bot)
+        .messages_handler(analyze_message);
+
+    dispatcher.dispatch().await;
 
     }
 
