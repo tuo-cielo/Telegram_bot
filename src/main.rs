@@ -1,142 +1,129 @@
-use teloxide::{filter_command, handler, prelude::*, repl, utils::command::BotCommands};
-use dotenvy::dotenv;
-use teloxide::types::Message;
-use teloxide::types::AllowedUpdate;
+use teloxide::{prelude::*, utils::command::BotCommands};
+use std::collections::HashMap;
+use std::error::Error;
+use std::env;
+use once_cell::sync::Lazy;
+use std::sync::Mutex;
+
+use dotenv::dotenv;
+
+static BOOKS_LIST: Lazy<Mutex<HashMap<ChatId, Vec<String>>>> = Lazy::new(|| {
+    match serde_any::from_file("books_list.json") {
+        Ok(hm) => Mutex::new(hm),
+        Err(_) => Mutex::new(HashMap::new())
+    }
+});
+
+#[derive(BotCommands, Clone)]
+#[command(rename = "lowercase", description = "Вот такие комманды есть:")]
+enum Command {
+    #[command(description = "Выводит этот текст.")]
+    Help,
+    #[command(description = "Добавить книгу в список")]
+    Add(String),
+    #[command(description = "Удалить книгу из списка: /remove <номер книги в списке>")]
+    Remove(String),
+    #[command(description = "Выводит список")]
+    List,
+}
 
 #[tokio::main]
 async fn main() {
     pretty_env_logger::init();
-    log::info!("Starting command bot...");
 
-    let token = dotenvy::var("TELOXIDE_TOKEN").unwrap(); //Это не трогать
+    let token = dotenv::var("TELOXIDE_TOKEN").unwrap(); //Это не трогать
     let bot = Bot::new(token); //Не трогать
 
-    Command::repl(bot, answer).await;
-
-    }
-
-
-#[derive(BotCommands, Clone)]
-#[command(rename_rule = "lowercase", description = "Существуют следующие команды:")]
-enum Command {
-    #[command(description = "Выводит этот список команд")]
-    Help,
-    #[command(description = "Ссылка на сайт ВУЗа")]
-    Mtuci,
-    #[command(description = "Рассказывает о ВУЗе если вы только собрались поступить к нам")]
-    Абитуриенту,
-    #[command(description = "Мы рассказываем о некоторых наших направлениях")]
-    Направления
+    let bot = Bot::from_env().auto_send();
+    println!("РАБОТАЕТ");
+    teloxide::commands_repl(bot, answer, Command::ty()).await;
 }
 
-async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
-    match cmd {
-        Command::Help => {
-            let result = bot.send_message(msg.chat.id, Command::descriptions().to_string()).await;
-            if let Err(err) = result {
-                log::error!("Failed to send message: {:?}", err);
-            }
-        }
-        Command::Mtuci => {
-            let result = bot.send_message(msg.chat.id, format!("https://mtuci.ru/")).await;
-            if let Err(err) = result {
-                log::error!("Failed to send message: {:?}", err);
-            }
-        }
-        Command::Абитуриенту => {
-            let result = bot.send_message(msg.chat.id, format!("Информация о месте нахождения образовательной организации:
-Адрес МТУСИ: 111024, г. Москва, ул. Авиамоторная, 8а;
-Адрес МТУСИ: 123423, г. Москва, ул. Народного Ополчения, д. 32
-Адрес КТ МТУСИ: 125493, г. Москва, ул. Авангардная, д. 5.
-
-
-Информация о режиме и графике работы образовательной организации:
-График работы структурных подразделений:
-
-Пн – чт : 09:00- 18:00 ( обед 13:00-14:00)
-Пт : 09:00-16:45 ( обед 13:00-14:00)
-Прием ректором студентов проводится по понедельникам с 14:00 до 14:30
-
-Информация о контактных телефонах образовательной организации:
-Ректорат +7 (495)957-79-17
-Пост охраны +7(495)957-7945
-
-Отдел документационного обеспечения управления +7(495)957-7731, факс +7(495)925-04-35
-
-Информация об адресах электронной почты образовательной организации:
-Ректорат: mtuci@mtuci.ru
-Отдел документационного обеспечения управления: kanc@mtuci.ru")).await;
-            if let Err(err) = result {
-                log::error!("Failed to send message: {:?}", err);
-            }
-        }
-        Command::Направления => {
-            let result = bot.send_message(msg.chat.id, format!("\
-
-            01.03.02 Прикладная математика и информатика
-Подготовка специалистов в области математики, анализа данных, программирования, информационно-коммуникационных технологий
-
-01.03.04 Прикладная математика
-Подготовка специалистов для решения задач в различных прикладных областях с использованием математики и компьютерных технологий.
-
-02.03.02 Фундаментальная информатика и информационные технологии
-Универсальное IT-направление готовит компьютерщиков широкого профиля.
-
-09.03.01 Информатика и вычислительная техника
-Направление подготовки в области информационных систем и сетей, разработкой программного обеспечения автоматизированных систем.
-
-09.03.02 Информационные системы и технологии
-Это направление обучения в области проектирования, отладки, производства и эксплуатации информационных технологий и систем.
-
-09.03.03 Прикладная информатика
-Подготовка IT-специалистов для системного анализа прикладной области, решения прикладных задач информационных систем.
-
-09.03.04 Программная инженерия
-Это направление подготовки специалистов для проектирования, разработки и сопровождения программного обеспечения.
-
-И многие другие (Смотрите на официальном сайте)
-")).await;
-            if let Err(err) = result {
-                log::error!("Failed to send message: {:?}", err);
-
-            }
-        }
-    }
-
+async fn answer(bot: AutoSend<Bot>, message: Message, command: Command, ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    match command {
+        Command::Help           => { bot.send_message(message.chat.id, Command::descriptions().to_string()).await? },
+        Command::Add(items)    => { bot.send_message(message.chat.id, add_to_list(&bot, message, items)).await? },
+        Command::Remove(items)     => { bot.send_message(message.chat.id, remove_from_list(&bot, message, items)).await? },
+        Command::List           => { bot.send_message(message.chat.id, display_list(&bot, message)).await? },
+    };
     Ok(())
 }
 
+fn display_list(_: &AutoSend<Bot>, message: Message, )  -> String  {
+    let mut subs = BOOKS_LIST.lock().unwrap();
+    match subs.get_mut(&message.chat.id) {
+        Some(items) =>  {
+            if items.len() == 0 {
+                return format!("Нет книг в списке...")
+            }
+            let mut out = "".to_string();
+            for (i, x) in items.iter().enumerate() {
+                out = format!("{}\n{}\t\t{}", out, i, x);
+            }
+            out
+        },
+        None => format!("Нет книг в списке..."),
+    }
+}
 
-//другой вариант
-// async fn handle_message(bot: Bot, msg: Message, text: &str) -> Result<(), Box<dyn std::error::Error>> {
-//     if text.contains("привет") {
-//         bot.send_message(msg.chat.id, "Привет!").await?;
-//     } else if text.contains("как дела?") {
-//         bot.send_message(msg.chat.id, "Хорошо").await?;
-//     } else {
-//         bot.send_message(msg.chat.id, "Я не понимаю вас.").await?;
-//     }
-//
-//     Ok(())
-// }
-//
-// async fn analyze_message(bot: Bot, msg: Message, text: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
-//     if let Some(text) = text {
-//         handle_message(bot, msg, &text).await?;
-//     }
-//
-//     Ok(())
-//}
-
-
-async fn analyze_message(bot: Bot, msg: Message, text: &str) -> Result<(), Box<dyn std::error::Error>> {
-    if text.contains("привет") {
-        bot.send_message(msg.chat.id, "Привет!").await?;
-    } else if text.contains("как дела?") {
-        bot.send_message(msg.chat.id, "Хорошо").await?;
+fn remove_from_list(_: &AutoSend<Bot>, message: Message, items: String, ) -> String {
+    let mut list = BOOKS_LIST.lock().unwrap();
+    let resp = if items.eq("all") {
+        match list.get_mut(&message.chat.id) {
+            Some(v) => v.clear(),
+            None => ()
+        }
+        "Убрать все книги из списка".to_string()
     } else {
-        bot.send_message(msg.chat.id, "Я не понимаю вас.").await?;
-    }
+        let ids: Vec<usize> = items
+            .split_whitespace()
+            .map(|id_str| id_str.parse::<usize>())
+            .take_while(|x|x.is_ok())
+            .map(|x|x.ok().unwrap())
+            .collect();
 
-    Ok(())
+        match list.get_mut(&message.chat.id) {
+            Some(v) =>  {
+                let mut out = String::new();
+                for id in ids {
+                    v.remove(id as usize);
+                    println!("Убрать книгу из списка: {:?}", id);
+                    out = format!("{}Книга была удалена.\n", out);
+                }
+                out
+            },
+            None => format!("..."),
+        }
+    };
+    match serde_any::to_file("books_list.json", &*list) {
+        Ok(_) => {();},
+        Err(e) => {println!("Оибка сохранения: {:?}", e);}
+    };
+    resp
+}
+
+fn add_to_list(_: &AutoSend<Bot>, message: Message, items: String, ) -> String {
+    let mut list = BOOKS_LIST.lock().unwrap();
+    list.entry(message.chat.id).or_insert(Vec::new());
+    let resp = match list.get_mut(&message.chat.id) {
+        Some(v) =>  {
+            let mut out = String::new();
+            for item_slice in items.split(",") {
+                let item = item_slice.trim().to_string();
+                if v.iter().find(|&x| *x == *item) == None {
+                    v.push(item.clone());
+                    out = format!("{}Успешно добавлена книга({}) в список.\n", out, item);
+                } else {
+                    out = format!("{}Вы уже добавили книгу в список.\n", out);
+                }
+            }
+            out
+        },
+        None => format!("Поломалась"),
+    };
+    match serde_any::to_file("books_list.json", &*list) {
+        Ok(_) => {();},
+        Err(e) => {println!("Ошибка в сохранении: {:?}", e);}
+    };
+    resp
 }
